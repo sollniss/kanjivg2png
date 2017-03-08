@@ -12,7 +12,7 @@ class Importer
 
     WIDTH = 109 # 109 per character
     HEIGHT = 109 # 109 per character
-    SVG_HEAD = "<svg width=\"__WIDTH__px\" height=\"#{HEIGHT}px\" viewBox=\"0 0 __VIEW_WIDTH__px #{HEIGHT}px\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xml:space=\"preserve\" version=\"1.1\"  baseProfile=\"full\">"
+    SVG_HEAD = "<svg width=\"__WIDTH__px\" height=\"__HEIGHT__px\" viewBox=\"0 0 __VIEW_WIDTH__px __VIEW_HEIGHT__px\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xml:space=\"preserve\" version=\"1.1\"  baseProfile=\"full\">"
     SVG_FOOT = '</svg>'
     TEXT_STYLE = 'fill:#FF2A00;font-family:Helvetica;font-weight:normal;font-size:14;stroke-width:0'
     PATH_STYLE = 'fill:none;stroke:black;stroke-width:3'
@@ -56,42 +56,77 @@ class Importer
       else
         codepoint = entry['kvg:element'].codepoints.first
       end
-
+	  
       svg = File.open("#{@output_dir}/#{codepoint}_#{@type}.svg", File::RDWR|File::TRUNC|File::CREAT)
       stroke_count = 0
       stroke_total = entry.css('path[d]').length
       paths = []
-
+	  
+      fives, rest = stroke_total.divmod(5)
+	  
       # Generate the header
       if @type == :frames
-        width = (WIDTH * stroke_total)# + (2 * (stroke_total - 1))
+	    t = (stroke_total > 5) ? 5 : stroke_total
+        width = (WIDTH * t)# + (2 * (stroke_total - 1))
         view_width = width
+        height = rest == 0 ? HEIGHT * fives : HEIGHT * (fives+1)
+        view_height = height
       else
         width = WIDTH * 1
       end
       header = SVG_HEAD.gsub('__WIDTH__', width.to_s)
       header = header.gsub('__VIEW_WIDTH__', view_width.to_s)
+      header = header.gsub('__HEIGHT__', height.to_s)
+      header = header.gsub('__VIEW_HEIGHT__', view_height.to_s)
       svg << "#{header}\n"
 
       # Guide lines
       if @type == :frames
-        # Outer box
-        top = 1; left = 1; bottom = HEIGHT - 1; right = width - 1
-        svg << line(left, top, right, top, LINE_STYLE) # top
-        svg << line(left, top, left, bottom, LINE_STYLE) # left
-        svg << line(left, bottom, right, bottom, LINE_STYLE) # bottom
-        svg << line(right, top, right, bottom, LINE_STYLE) # right
 
-        (1 .. stroke_total - 1).each do |i|
-          svg << line(WIDTH * i, top, WIDTH * i, bottom, LINE_STYLE)
+        # outside box
+        svg << line(1, 1, width - 1, 1, LINE_STYLE) # top
+        svg << line(1, 1, 1, height - 1, LINE_STYLE) # left
+        svg << line(1, height - 1, WIDTH * rest - 1, height - 1, LINE_STYLE) # bottom
+        #svg << line(WIDTH * rest - 1, top, WIDTH * rest - 1, bottom, LINE_STYLE) # right
+		
+        # line separators
+        (1 .. fives).each do |i|
+          # draw horizontal lines for a 5er row
+          svg << line(1, HEIGHT * i - 1, width - 1, HEIGHT * i - 1, LINE_STYLE)
         end
+		
+        fives, rest = stroke_total.divmod(5)
 
-        # Inner guides
-        svg << line(left, (HEIGHT/2), right, (HEIGHT/2), DASHED_LINE_STYLE)
-
-        (1 .. stroke_total).each do |i|
-          svg << line((WIDTH/2)+(WIDTH*(i-1)+1), top, (WIDTH/2)+(WIDTH*(i-1)+1), bottom, DASHED_LINE_STYLE)
+        (0 .. fives-1).each do |i|
+           # vertical lines for a 5er row
+           svg << line(WIDTH * 1 - 1, HEIGHT * i - 1, WIDTH * 1 - 1, HEIGHT * (i+1) - 1, LINE_STYLE)
+           svg << line(WIDTH * 2 - 1, HEIGHT * i - 1, WIDTH * 2 - 1, HEIGHT * (i+1) - 1, LINE_STYLE)
+           svg << line(WIDTH * 3 - 1, HEIGHT * i - 1, WIDTH * 3 - 1, HEIGHT * (i+1) - 1, LINE_STYLE)
+           svg << line(WIDTH * 4 - 1, HEIGHT * i - 1, WIDTH * 4 - 1, HEIGHT * (i+1) - 1, LINE_STYLE)
+           svg << line(WIDTH * 5 - 1, HEIGHT * i - 1, WIDTH * 5 - 1, HEIGHT * (i+1) - 1, LINE_STYLE)
+           
+           # horizontal grid lines
+           svg << line(1, (HEIGHT/2)*(2*i+1), width - 1, (HEIGHT/2)*(2*i+1), DASHED_LINE_STYLE)
         end
+		
+        # vertical grid lines
+        svg << line((WIDTH/2)+(WIDTH * 0)+1, 1, (WIDTH/2)+(WIDTH * 0)+1, HEIGHT * fives, DASHED_LINE_STYLE)
+        svg << line((WIDTH/2)+(WIDTH * 1)+1, 1, (WIDTH/2)+(WIDTH * 1)+1, HEIGHT * fives, DASHED_LINE_STYLE)
+        svg << line((WIDTH/2)+(WIDTH * 2)+1, 1, (WIDTH/2)+(WIDTH * 2)+1, HEIGHT * fives, DASHED_LINE_STYLE)
+        svg << line((WIDTH/2)+(WIDTH * 3)+1, 1, (WIDTH/2)+(WIDTH * 3)+1, HEIGHT * fives, DASHED_LINE_STYLE)
+        svg << line((WIDTH/2)+(WIDTH * 4)+1, 1, (WIDTH/2)+(WIDTH * 4)+1, HEIGHT * fives, DASHED_LINE_STYLE)
+
+        (1 .. rest).each do |i|
+          # vertical lines for last row
+          svg << line(WIDTH * i - 1, HEIGHT * fives - 1, WIDTH * i - 1, HEIGHT * (fives+1) - 1, LINE_STYLE)
+		   
+          # vertical grid lines for last row
+          svg << line((WIDTH/2)+(WIDTH * (i-1))+1, HEIGHT * fives, (WIDTH/2)+(WIDTH * (i-1))+1, height - 1, DASHED_LINE_STYLE)
+        end
+		
+        # last horizontal grid line
+        svg << line(1, (HEIGHT/2)*(2*fives+1), WIDTH * rest - 1, (HEIGHT/2)*(2*fives+1), DASHED_LINE_STYLE)
+
       end
 
       # Draw the strokes
@@ -113,11 +148,17 @@ class Importer
           path_start_x = md[1].to_f
           path_start_y = md[2].to_f
           path_start_x += WIDTH * (stroke_count - 1)
-
+          
+          h = 0
+          w = 0
+          
           paths.each_with_index do |path, i|
             last = ((stroke_count - 1) == i)
             delta = last ? WIDTH * (stroke_count - 1) : WIDTH
-
+			
+            h, asd = (stroke_count - 1).divmod(5)
+            w, asd = i.divmod(5)
+			
             # Move strokes relative to the frame
             path.gsub!(%r{([LMTm]) (#{COORD_RE})}x) do |m|
               letter = $1
@@ -144,11 +185,11 @@ class Importer
               "#{letter}#{x1},#{$3},#{x2},#{$5},#{x3}"
             end
 
-            svg << "<path d=\"#{path}\" style=\"#{last ? PATH_STYLE : INACTIVE_PATH_STYLE}\" />\n"
+            svg << "<path d=\"#{path}\" style=\"#{last ? PATH_STYLE : INACTIVE_PATH_STYLE}\" transform=\"translate(#{-WIDTH*h*5},#{HEIGHT*h})\"/>\n"
           end
 
           # Put a circle at the stroke start
-          svg << "<circle cx=\"#{path_start_x}\" cy=\"#{path_start_y}\" r=\"5\" stroke-width=\"0\" fill=\"#FF2A00\" opacity=\"0.7\" />"
+          svg << "<circle cx=\"#{path_start_x}\" cy=\"#{path_start_y}\" r=\"5\" stroke-width=\"0\" fill=\"#FF2A00\" opacity=\"0.7\" transform=\"translate(#{-WIDTH*w*5},#{HEIGHT*w})\"/>"
           svg << "\n"
         end
       end
