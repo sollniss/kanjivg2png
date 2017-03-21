@@ -4,6 +4,7 @@
 # KanjiVG is copyright (c) 2009/2010 Ulrich Apel and released under the Creative Commons Attribution-Share Alike 3.0
 
 require 'rubygems'
+require 'rsvg2'
 require 'nokogiri'
 require 'pp'
 
@@ -15,13 +16,13 @@ class Importer
     SVG_HEAD = "<svg width=\"__WIDTH__px\" height=\"__HEIGHT__px\" viewBox=\"0 0 __VIEW_WIDTH__px __VIEW_HEIGHT__px\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xml:space=\"preserve\" version=\"1.1\"  baseProfile=\"full\">"
     SVG_FOOT = '</svg>'
     TEXT_STYLE = 'fill:#FF2A00;font-family:Helvetica;font-weight:normal;font-size:14;stroke-width:0'
-    PATH_STYLE = 'fill:none;stroke:black;stroke-width:3'
-    INACTIVE_PATH_STYLE = 'fill:none;stroke:#999;stroke-width:3'
-    LINE_STYLE = 'stroke:#ddd;stroke-width:2'
-    DASHED_LINE_STYLE = 'stroke:#ddd;stroke-width:2;stroke-dasharray:3 3'
-    ENTRY_NAME = 'svg'
-    COORD_RE = %r{(?ix:\d+ (?:\.\d+)?)}
+    CURRENT_PATH_STYLE = 'fill:none;stroke:black;stroke-width:3'
+    EXISTING_PATH_STYLE = 'fill:none;stroke:#999;stroke-width:3'
+    BOUDING_BOX_STYLE = 'stroke:#ddd;stroke-width:2'
+    GUIDE_LINE_STYLE = 'stroke:#ddd;stroke-width:2;stroke-dasharray:3 3'
 
+    ENTRY_NAME = 'svg'
+    COORD_RE = /-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/ #/(?:\d+(?:\.\d+)?)/ #%r{(?ix:\d+ (?:\.\d+)?)}
     def initialize(doc, output_dir, type = :numbers)
       @output_dir = output_dir
       @type = type
@@ -31,9 +32,9 @@ class Importer
       tmp = ""
       begin
         while (line = doc.readline)
-          if line =~ %r{<#{ENTRY_NAME}}
+          if line =~ /<#{ENTRY_NAME}/
             tmp = line
-          elsif line =~ %r{</#{ENTRY_NAME}>}
+          elsif line =~ /<\/#{ENTRY_NAME}>/
             tmp << line
             noko = Nokogiri::XML(tmp)
             parse(noko)
@@ -57,7 +58,8 @@ class Importer
         codepoint = entry['kvg:element'].codepoints.first
       end
 	  
-      svg = File.open("#{@output_dir}/#{codepoint}_#{@type}.svg", File::RDWR|File::TRUNC|File::CREAT)
+      #svg = File.open("#{@output_dir}/#{codepoint}_#{@type}.svg", File::RDWR|File::TRUNC|File::CREAT)
+      svg = ""
       stroke_count = 0
       stroke_total = entry.css('path[d]').length
       paths = []
@@ -84,48 +86,48 @@ class Importer
       if @type == :frames
 
         # outside box
-        svg << line(1, 1, width - 1, 1, LINE_STYLE) # top
-        svg << line(1, 1, 1, height - 1, LINE_STYLE) # left
-        svg << line(1, height - 1, WIDTH * rest - 1, height - 1, LINE_STYLE) # bottom
-        #svg << line(WIDTH * rest - 1, top, WIDTH * rest - 1, bottom, LINE_STYLE) # right
+        svg << line(1, 1, width - 1, 1, BOUDING_BOX_STYLE) # top
+        svg << line(1, 1, 1, height - 1, BOUDING_BOX_STYLE) # left
+        svg << line(1, height - 1, WIDTH * rest - 1, height - 1, BOUDING_BOX_STYLE) # bottom
+        #svg << line(WIDTH * rest - 1, top, WIDTH * rest - 1, bottom, BOUDING_BOX_STYLE) # right
 		
         # line separators
         (1 .. fives).each do |i|
           # draw horizontal lines for a 5er row
-          svg << line(1, HEIGHT * i - 1, width - 1, HEIGHT * i - 1, LINE_STYLE)
+          svg << line(1, HEIGHT * i - 1, width - 1, HEIGHT * i - 1, BOUDING_BOX_STYLE)
         end
 		
         fives, rest = stroke_total.divmod(5)
 
         (0 .. fives-1).each do |i|
            # vertical lines for a 5er row
-           svg << line(WIDTH * 1 - 1, HEIGHT * i - 1, WIDTH * 1 - 1, HEIGHT * (i+1) - 1, LINE_STYLE)
-           svg << line(WIDTH * 2 - 1, HEIGHT * i - 1, WIDTH * 2 - 1, HEIGHT * (i+1) - 1, LINE_STYLE)
-           svg << line(WIDTH * 3 - 1, HEIGHT * i - 1, WIDTH * 3 - 1, HEIGHT * (i+1) - 1, LINE_STYLE)
-           svg << line(WIDTH * 4 - 1, HEIGHT * i - 1, WIDTH * 4 - 1, HEIGHT * (i+1) - 1, LINE_STYLE)
-           svg << line(WIDTH * 5 - 1, HEIGHT * i - 1, WIDTH * 5 - 1, HEIGHT * (i+1) - 1, LINE_STYLE)
+           svg << line(WIDTH * 1 - 1, HEIGHT * i - 1, WIDTH * 1 - 1, HEIGHT * (i+1) - 1, BOUDING_BOX_STYLE)
+           svg << line(WIDTH * 2 - 1, HEIGHT * i - 1, WIDTH * 2 - 1, HEIGHT * (i+1) - 1, BOUDING_BOX_STYLE)
+           svg << line(WIDTH * 3 - 1, HEIGHT * i - 1, WIDTH * 3 - 1, HEIGHT * (i+1) - 1, BOUDING_BOX_STYLE)
+           svg << line(WIDTH * 4 - 1, HEIGHT * i - 1, WIDTH * 4 - 1, HEIGHT * (i+1) - 1, BOUDING_BOX_STYLE)
+           svg << line(WIDTH * 5 - 1, HEIGHT * i - 1, WIDTH * 5 - 1, HEIGHT * (i+1) - 1, BOUDING_BOX_STYLE)
            
            # horizontal grid lines
-           svg << line(1, (HEIGHT/2)*(2*i+1), width - 1, (HEIGHT/2)*(2*i+1), DASHED_LINE_STYLE)
+           svg << line(1, (HEIGHT/2)*(2*i+1), width - 1, (HEIGHT/2)*(2*i+1), GUIDE_LINE_STYLE)
         end
 		
         # vertical grid lines
-        svg << line((WIDTH/2)+(WIDTH * 0)+1, 1, (WIDTH/2)+(WIDTH * 0)+1, HEIGHT * fives, DASHED_LINE_STYLE)
-        svg << line((WIDTH/2)+(WIDTH * 1)+1, 1, (WIDTH/2)+(WIDTH * 1)+1, HEIGHT * fives, DASHED_LINE_STYLE)
-        svg << line((WIDTH/2)+(WIDTH * 2)+1, 1, (WIDTH/2)+(WIDTH * 2)+1, HEIGHT * fives, DASHED_LINE_STYLE)
-        svg << line((WIDTH/2)+(WIDTH * 3)+1, 1, (WIDTH/2)+(WIDTH * 3)+1, HEIGHT * fives, DASHED_LINE_STYLE)
-        svg << line((WIDTH/2)+(WIDTH * 4)+1, 1, (WIDTH/2)+(WIDTH * 4)+1, HEIGHT * fives, DASHED_LINE_STYLE)
+        svg << line((WIDTH/2)+(WIDTH * 0)+1, 1, (WIDTH/2)+(WIDTH * 0)+1, HEIGHT * fives, GUIDE_LINE_STYLE)
+        svg << line((WIDTH/2)+(WIDTH * 1)+1, 1, (WIDTH/2)+(WIDTH * 1)+1, HEIGHT * fives, GUIDE_LINE_STYLE)
+        svg << line((WIDTH/2)+(WIDTH * 2)+1, 1, (WIDTH/2)+(WIDTH * 2)+1, HEIGHT * fives, GUIDE_LINE_STYLE)
+        svg << line((WIDTH/2)+(WIDTH * 3)+1, 1, (WIDTH/2)+(WIDTH * 3)+1, HEIGHT * fives, GUIDE_LINE_STYLE)
+        svg << line((WIDTH/2)+(WIDTH * 4)+1, 1, (WIDTH/2)+(WIDTH * 4)+1, HEIGHT * fives, GUIDE_LINE_STYLE)
 
         (1 .. rest).each do |i|
           # vertical lines for last row
-          svg << line(WIDTH * i - 1, HEIGHT * fives - 1, WIDTH * i - 1, HEIGHT * (fives+1) - 1, LINE_STYLE)
+          svg << line(WIDTH * i - 1, HEIGHT * fives - 1, WIDTH * i - 1, HEIGHT * (fives+1) - 1, BOUDING_BOX_STYLE)
 		   
           # vertical grid lines for last row
-          svg << line((WIDTH/2)+(WIDTH * (i-1))+1, HEIGHT * fives, (WIDTH/2)+(WIDTH * (i-1))+1, height - 1, DASHED_LINE_STYLE)
+          svg << line((WIDTH/2)+(WIDTH * (i-1))+1, HEIGHT * fives, (WIDTH/2)+(WIDTH * (i-1))+1, height - 1, GUIDE_LINE_STYLE)
         end
 		
         # last horizontal grid line
-        svg << line(1, (HEIGHT/2)*(2*fives+1), WIDTH * rest - 1, (HEIGHT/2)*(2*fives+1), DASHED_LINE_STYLE)
+        svg << line(1, (HEIGHT/2)*(2*fives+1), WIDTH * rest - 1, (HEIGHT/2)*(2*fives+1), GUIDE_LINE_STYLE)
 
       end
 
@@ -136,15 +138,15 @@ class Importer
 
         case @type
         when :animated
-          svg << "<path d=\"#{stroke['d']}\" style=\"#{PATH_STYLE};opacity:0\">\n"
+          svg << "<path d=\"#{stroke['d']}\" style=\"#{CURRENT_PATH_STYLE};opacity:0\">\n"
           svg << "  <animate attributeType=\"CSS\" attributeName=\"opacity\" from=\"0\" to=\"1\" begin=\"#{stroke_count-1}s\" dur=\"1s\" repeatCount=\"0\" fill=\"freeze\" />\n"
           svg << "</path>\n"
         when :numbers
           x, y = move_text_relative_to_path(stroke['d'])
           svg << "<text x=\"#{x}\" y=\"#{y}\" style=\"#{TEXT_STYLE}\">#{stroke_count}</text>\n"
-          svg << "<path d=\"#{stroke['d']}\" style=\"#{PATH_STYLE}\" />\n"
+          svg << "<path d=\"#{stroke['d']}\" style=\"#{CURRENT_PATH_STYLE}\" />\n"
         when :frames
-          md = %r{^[LMT] \s* (#{COORD_RE}) , (#{COORD_RE})}ix.match(paths.last)
+          md = /^[LMT]\s*(#{COORD_RE})[,\s]*(#{COORD_RE})/ix.match(paths.last)
           path_start_x = md[1].to_f
           path_start_y = md[2].to_f
           path_start_x += WIDTH * (stroke_count - 1)
@@ -153,20 +155,22 @@ class Importer
           w = 0
           
           paths.each_with_index do |path, i|
-            last = ((stroke_count - 1) == i)
-            delta = last ? WIDTH * (stroke_count - 1) : WIDTH
+            isLast = ((stroke_count - 1) == i)
+            delta = isLast ? WIDTH * (stroke_count - 1) : WIDTH
 			
             h, asd = (stroke_count - 1).divmod(5)
             w, asd = i.divmod(5)
-			
+            #path.gsub!("M ", "M")
+            
             # Move strokes relative to the frame
-            path.gsub!(%r{([LMTm]) (#{COORD_RE})}x) do |m|
+
+            path.gsub!(/([LMTm])\s*(#{COORD_RE})/x) do |m| #('^[LMT]\\s*(' + coordRe + ')[,\\s](' + coordRe + ')', 'i');
               letter = $1
               x  = $2.to_f
               x += delta
               "#{letter}#{x}"
             end
-            path.gsub!(%r{(S) (#{COORD_RE}) , (#{COORD_RE}) , (#{COORD_RE})}x) do |m|
+            path.gsub!(/(S)\s*(#{COORD_RE})[,\s]*(#{COORD_RE})[,\s]*(#{COORD_RE})/) do |m|
               letter = $1
               x1  = $2.to_f
               x1 += delta
@@ -174,7 +178,7 @@ class Importer
               x2 += delta
               "#{letter}#{x1},#{$3},#{x2}"
             end
-            path.gsub!(%r{(C) (#{COORD_RE}) , (#{COORD_RE}) , (#{COORD_RE}) , (#{COORD_RE}) , (#{COORD_RE})}x) do |m|
+            path.gsub!(/((?!^)\G[-,\s]|C)\s*(#{COORD_RE})[-,\s](#{COORD_RE})[-,\s](#{COORD_RE})[-,\s](#{COORD_RE})[-,\s](#{COORD_RE})[-,\s](#{COORD_RE})/) do |m|
               letter  = $1
               x1  = $2.to_f
               x1 += delta
@@ -182,10 +186,11 @@ class Importer
               x2 += delta
               x3  = $6.to_f
               x3 += delta
-              "#{letter}#{x1},#{$3},#{x2},#{$5},#{x3}"
+              "#{letter}#{x1},#{$3},#{x2},#{$5},#{x3},#{$7}"
             end
 
-            svg << "<path d=\"#{path}\" style=\"#{last ? PATH_STYLE : INACTIVE_PATH_STYLE}\" transform=\"translate(#{-WIDTH*h*5},#{HEIGHT*h})\"/>\n"
+
+            svg << "<path d=\"#{path}\" style=\"#{isLast ? CURRENT_PATH_STYLE : EXISTING_PATH_STYLE}\" transform=\"translate(#{-WIDTH*h*5},#{HEIGHT*h})\"/>\n"
           end
 
           # Put a circle at the stroke start
@@ -195,12 +200,13 @@ class Importer
       end
 
       svg << SVG_FOOT
-      svg.close
+
+      ImageConvert.save_svg_as_png(svg, width, height, "#{@output_dir}/#{codepoint}_#{@type}.png")
     end
 
     # TODO: make this shit really smart
     def move_text_relative_to_path(path)
-      md = %r{^M (#{COORD_RE}) , (#{COORD_RE})}ix.match(path)
+      md = /^M (#{COORD_RE}) , (#{COORD_RE})/ix.match(path)
       path_start_x = md[1].to_f
       path_start_y = md[2].to_f
 
@@ -215,12 +221,26 @@ class Importer
     end
 
   end
+
+  class ImageConvert
+  def self.save_svg_as_png(svg, width, height, destination)
+    svg = RSVG::Handle.new_from_data(svg)
+    width   = width  ||=500
+    height  = height ||=500
+    surface = Cairo::ImageSurface.new(Cairo::FORMAT_ARGB32, width, height)
+    context = Cairo::Context.new(surface)
+    context.render_rsvg_handle(svg)
+    surface.write_to_png(destination)
+  end
+end
+
 end
 
 input_dir = ARGV[0] # Directory of .svg's
-type = ARGV[1] || 'frames' # Style of output, frames|animated|numbers
+output_dir = ARGV[1] # Directory of .png's
+type = ARGV[2] || 'frames' # Style of output, frames|animated|numbers
 
-output_dir = File.expand_path('../svgs',  __FILE__)
+#output_dir = File.expand_path('../svgs',  __FILE__)
 Dir.mkdir(output_dir) unless File.exists?(output_dir)
 
 processed = 0
