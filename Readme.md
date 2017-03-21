@@ -1,16 +1,14 @@
-kanjivg2svg
+kanjivg2png
 ===========
 
-This Ruby 1.9 script takes stroke order data from the [KanjiVG](http://kanjivg.tagaini.net/) project and outputs SVG files with special formatting.
+This Ruby script takes stroke order data from the [KanjiVG](http://kanjivg.tagaini.net/) project and outputs PNG files with special formatting.
 
 Usage
 -----
 
-    $ ruby kanjivg2svg.rb path/to/kanji [frames|animated|numbers]
+    $ ruby kanjivg2svg.rb path/to/kanji path/to/pngfolder [frames|animated|numbers]
 
-You can change the output type by setting the second argument. If not set it will default to 'frames'. The animated and numbers are less perfected compared to the frames output.
-
-In this repo I've included svg files generated with the 'frames' option.
+You can change the output type by setting the third argument. If not set it will default to PNG 'frames'. The animated and numbers are in SVG format like the original script and less perfected compared to the frames output.
 
 License
 -------
