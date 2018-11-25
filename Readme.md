@@ -1,7 +1,9 @@
 kanjivg2png
 ===========
 
-This Ruby script takes stroke order data from the [KanjiVG](http://kanjivg.tagaini.net/) project and outputs PNG files with special formatting.
+This Ruby script takes stroke order data from the [KanjiVG](http://kanjivg.tagaini.net/) project and outputs PNG files in a grid format:
+
+<img src="example.png" alt="example result" class="inline"/>
 
 Usage
 -----
